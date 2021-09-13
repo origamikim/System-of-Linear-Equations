@@ -1,0 +1,115 @@
+import numpy as np
+class Matrix:
+    def __init__ (self, matrix) :
+        self.matrix = matrix.astype(float) #m by n matrix
+        self.m = len(matrix);  # number of equations
+        self.n = len(matrix[0]) #number of variables +1 (including source matrix) therefore, number of variables = n-1
+        self.pivot = np.zeros(self.m).astype(int) #leading entries (pivot)
+        self.zeroes = 0  # row consists of only zeros
+        self.ref = matrix.astype(float) # row - reduce row echelon form matrix
+        self.leading() #to get pivot / zeros
+        self.REF() # to get  REF
+        self.RREF() # to get  RREF
+        self.coeff = np.zeros((self.m,self.n-1)).astype(float) #coefficent matrix (left of the equal sign)
+        self.source = np.zeros((self.m, 1)) #source matrix (right of the eqaul sign)
+        self.separate() #separate matrix into coefficient(augment) matrix and source matrix
+        self.rank = self.m - self.zeroes #rank(A) : number of leading entries  = number of equations- zeroes
+        self.full_rank = bool  #if rank(A) = min(m,n), we call A has full rank
+        self.full()
+        self.freerole = [ ] #free_roles 
+        self.free()
+        self.sol_type = "" #solution type: no-solution, n dimensional solution, unique
+        self.solution()
+        self.sol = [] #list of solutions
+    def leading(self): #Leading Entries
+        for i in range(self.m):
+            zero = 0
+            for j in range(self.n):
+                if self.ref[i][j] != 0: #Leading Entry is first column that is not zero
+                    self.pivot[i] = j # j is the leading entry index of row i
+                    break
+                else:
+                    zero += 1
+            if zero == self.n: # if the number of zeros == number of variables; this row consists of only zeros
+                self.pivot[i] = self.n #for this case, I defined pivot = number of variable (not mathematical)
+        self.zeroes = list(self.pivot).count(self.n) #number of row consists of only zero is used for computing the rank
+        return self.pivot, self.zeroes
+    
+    def EROs(self, row1, row2): #Elementary Row Operations 
+        const = self.ref[row2][self.pivot[row1]]/self.ref[row1][self.pivot[row1]]  # Multiply constants
+        self.ref[row2] = self.ref[row2] - const* self.ref[row1] #subtraction between two rows
+        self.leading() # Compute the leading entry again (leading entry can be changed)
+        return self.ref2
+    def EROs_Switch(self,row1, row2):
+        for i in range(self.n) :
+            temp = self.ref[row1][i]
+            self.ref[row1][i] = self.ref[row2][i] #switching two rows -> actually swapping the values 
+            self.ref[row2][i] = temp
+            self.leading()
+        return self.ref
+    def align(self):
+        while(True): #Until All pivots are in diagonal direction
+            count = 0 
+            for i in range(self.m-1):
+                if (self.pivot[i] < self.pivot[i+1]) : 
+                    count += 1
+                else :
+                    self.EROs_Switch(i,i+1)
+            if (count == self.m-1) :
+                break;
+    def REF(self) : #Row Echelon Form
+        for i in range(self.m-1):  #by multiplying constants and subtracting the rows, we get row echelon form
+            for j in range(i+1, self.m): 
+                self.EROs(i,j)
+        self.align() #align the REF; pivot should be in diagonal direction  and row of zeros should be at the bottom 
+        return self.ref
+                
+    def RREF(self) : #Reduced Row Echelon Form
+        for i in range(self.m-self.zeroes): #reduced REF's leading entries are always 1
+            self.ref[i] = self.ref[i] / self.ref[i][self.pivot[i]] #set pivot to 1
+            
+        for i in range(1, self.m-self.zeroes):
+            for j in range(0,i): #columns include leading entry should be consisted of only zeros except for the pivot
+                self.ref[j] = self.ref[j]-self.ref[j][self.pivot[i]]*self.ref[i]
+        return self.ref
+    
+    def separate(self): #separate into coefficient and source matrix
+        for i in range(self.m):
+            for j in range(self.n-1):
+                self.coeff[i][j] = self.ref[i][j]
+            self.source[i][0]=self.ref[i][self.n-1]
+        return self.coeff, self.ref
+    def full(self) :
+        if self.rank == min(self.m,self.n-1) : #when rank == n ; full rank
+            self.full_rank = True
+        else :
+            self.full_rank = False
+        return self.full_rank
+    def free(self) :
+        for i in range(self.n-1):
+            if i not in self.pivot:
+                self.freerole.append(i+1) #variables that have no leading entry are free role (coeff == 0)
+    def solution(self):
+        if self.n-1 in self.pivot:  # 0x + 0y +0z + ....  = k (k!=0) -> No Solution
+            self.sol_type = "No Solution"
+        elif self.full_rank == True:
+            self.sol_type = "Unique Solution" #If the matrix includes same equation, the soluton is not unique
+        elif self.rank >= self.n:
+            self.sol_type = "Unique Solution" #If the number of conditions is larger than variables, use part of it
+        else :
+            self.sol_type = str(self.n-1 -self.rank) + " Dimensional Solutions " # oo**(n-rank) solutions 
+        return self.sol_type
+    
+    def summary(self,printout = False ):
+        print("Initial Matrix\n", self.matrix)
+        print("Reduced Row Echelon Form\n",self.ref)
+        if printout == True :
+            print("Coefficient Matrix\n", self.coeff)
+            print("Source Matrix\n", self.source)
+        print("Rank: ", self.rank)
+        print("Full Rank:", self.full_rank)
+        print("Solution Type: ", self.sol_type)
+        if self.sol_type == "Unique Solution":
+            print("Solution: ")
+            for i in range (self.n-1):
+                print("x",i+1," = ", np.round(self.source[i][0],6))
